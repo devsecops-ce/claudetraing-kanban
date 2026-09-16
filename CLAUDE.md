@@ -4,12 +4,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-A single-page Kanban board for a fictional internal "UOB IT PMO", built as a Claude Code
-training/demo artifact. Everything lives in one file: `index.html` (~1370 lines: markup,
-one `<style>` block, one `<script>` block).
+A single-page **executive dashboard + Kanban board** tracking the readiness of every agent
+skill available to this repository, built as a Claude Code training/demo artifact. Everything
+lives in one file: `index.html` (markup, one `<style>` block, one `<script>` block).
 
-Not a real UOB system. Use only the text wordmark "UOB IT PMO" and the generic corporate
-blue palette — never a real UOB logo, trademark, or an imitation of an official UOB screen.
+The board was originally a fictional "UOB IT PMO" project board and was re-domained to a
+skills catalog. The engine is unchanged; the *content* and the display labels are new.
+**Internal field names are still the Kanban ones and deliberately differ from the UI labels:**
+
+| Internal field | Shown in the UI as |
+|---|---|
+| `project`  | Source (where the skill came from) |
+| `category` | Domain (what the skill is for) |
+| `assignee` | Maintainer |
+| `priority` | Relevance to this repo (values unchanged, so the `.p-*` / `.pill-*` CSS still applies) |
+| `dueDate`  | Target ready (the date the skill should be usable by) |
+
+Renaming those fields would be a large, low-value diff — but never assume a label and a field
+name match when grepping.
+
+Seed data is meant to be **true of this repo**: `image-3d` really did fail to install,
+`persona-project-manager` really does need a `gws` binary that is not on PATH. If the real
+state changes, change the seed rather than letting it drift into fiction.
 
 ## Hard constraints
 
@@ -59,6 +75,54 @@ are free text straight from the user. When adding a field to `renderCard()`, esc
 and it propagates; the only extra work for a new priority is a `.p-*` border-left rule and a
 `.pill-*` rule in the CSS.
 
+`STATUSES` is now `["Catalog", "Installed", "Blocked", "In Use"]`. **Renaming a column is not
+just a string change** — the openModal/init defaults set `status` explicitly, and `isOverdue()`
+excludes the terminal status. Both are covered below; grep for `SETTLED_STATUS` and for
+`getElementById("status").value =`.
+
+## The executive summary
+
+`renderExecutive(visible)` is fed the **same filtered array** as `renderSummary()`, straight
+from `renderBoard()`. That is the whole reason the stat tiles, the charts, the count badges and
+the board can never disagree. Never give a chart its own copy of the data or its own filter
+pass — one array, one render.
+
+It renders four things, and the form of each is a deliberate choice, not decoration:
+
+| Panel | Form | Why |
+|---|---|---|
+| Stat tiles | a bare number | a single figure is not a chart |
+| Readiness | one horizontal **stacked bar** | part-to-whole. Never a pie or donut |
+| Relevance, Domain | horizontal **bars**, one hue | magnitude, single series |
+| Blocked | a **list** | "what is stuck and why" is not a magnitude question |
+
+**Colour rules that are load-bearing:**
+
+- Readiness is an **ordinal progression** (Catalog → Installed → In Use), so it uses one blue
+  hue in three validated steps (`--viz-catalog` / `--viz-installed` / `--viz-inuse`), not four
+  unrelated hues. The ramp passes monotone-lightness, adjacent ΔL ≥ 0.06, and a 2.50:1 light
+  end on white. If you restep it, re-validate — do not eyeball it.
+- **Blocked** is an exception state, so it takes the reserved status-critical red
+  (`--viz-blocked`) and always ships with a ⚠ icon **and** a text label. Colour never carries
+  the meaning alone, and that red is never reused as a series colour.
+- Every chart also exposes a `<details>` data table. That is the documented relief for the
+  lightest ramp step sitting under 3:1, so do not delete it to save space.
+
+`"Usable today"` is `total - blocked`, **not** `Installed + In Use`. Catalog skills are built in
+and usable on demand; counting only what is on disk understates the inventory by 16.
+
+## Projection mode
+
+`body.projection` is toggled by `#projectionBtn` and bumps a handful of type-scale custom
+properties plus a short list of explicit overrides. It exists so the dashboard reads from the
+back of a meeting room.
+
+- The body class supplies the specificity, so it needs **no** priority overrides — keep it that
+  way.
+- It is in-memory like everything else here. It must not be persisted.
+- `.projection-on` / `.projection-off` swap the button's own label; keep both in sync with
+  `aria-pressed`.
+
 ## FormSubmit integration
 
 `FORMSUBMIT_ENDPOINT` (top of `<script>`, under the `CONFIG` banner) is the only place the
@@ -84,12 +148,19 @@ except this endpoint.
 There is no test runner, no linter, and no package manager here. Verification is manual plus
 an ad-hoc Node harness.
 
+The seed set is **24 skills** across all four columns. Counts on a clean load:
+Catalog 16, Installed 3, Blocked 4, In Use 1, Overdue 2.
+
 Constraint checks (fast, catches the most likely regressions):
 
 ```sh
 grep -niE "localStorage|sessionStorage|indexedDB|document\.cookie|\balert\(|\bconfirm\(|!important" index.html
 grep -noE "https?://[^\"' ]+" index.html   # expect only the FormSubmit endpoint
 ```
+
+Note that the first grep also matches the *words* in comments, so a hit is not automatically a
+violation — read the line. Do not write the literal token `!` + `important` into a comment; it
+trips the project's own check.
 
 Syntax check — extract the script block and parse it:
 
@@ -106,9 +177,17 @@ with `innerHTML`, `textContent`, `value`, `classList`, `addEventListener`, `setA
 counts, badges, overdue markers) and call `applyFilters()` / `validateForm()` / `moveTask()`
 directly. This covers rendering, filtering, validation and escaping.
 
+The stub also has to satisfy `renderExecutive()`, which reaches for `#kpiRow`,
+`#readinessChart`, `#domainChart`, `#blockedPanel` and `#execSub` — a `getElementById` that
+mints an object per id covers all of them.
+
 What the harness cannot reach — check these in a real browser (`open index.html`): drag and
-drop, the `<dialog>` modal, focus rings, the responsive stack below 768px, and the live
-network call.
+drop, the `<dialog>` modal, focus rings, the responsive stack below 768px, projection mode,
+per-column scrolling, chart geometry, and the live network call.
+
+Playwright's MCP server blocks `file:`, so to drive it use `python3 -m http.server` and load
+`http://127.0.0.1:<port>/index.html`. The favicon 404 that produces is an artefact of serving
+over HTTP and is not an app error.
 
 ## Behaviour details that are easy to get wrong
 
@@ -116,9 +195,12 @@ network call.
   Do not reach for `toISOString()` for a calendar date — it shifts across the UTC boundary and
   makes "due today" read as overdue. ISO strings compare correctly with `<`, which is why
   `isOverdue()` is a plain string comparison.
-- **Overdue excludes `Done`.** A completed task with a past due date is not overdue. Seed data
-  deliberately includes such a task, so the correct on-load badge count is 2 out of 3 past-due
-  tasks — if a change makes it 3, that is the bug.
+- **Overdue excludes the terminal column.** A skill already in use has no pending target date,
+  so it is never overdue. The rule reads `SETTLED_STATUS = STATUSES[STATUSES.length - 1]`
+  rather than a hard-coded string — an earlier hard-coded `"Done"` silently broke this check
+  the moment the columns were renamed. Seed data deliberately includes an `In Use` skill with a
+  past target, so the correct on-load badge count is **2 out of 3** past-target skills — if a
+  change makes it 3, that is the bug.
 - **Seed dates are relative** (`daysFromToday(±n)`), so the board always looks current. Do not
   replace them with hard-coded dates.
 - **The summary strip and count badges reflect the *filtered* view**, not the whole array —

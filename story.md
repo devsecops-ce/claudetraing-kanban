@@ -1,10 +1,14 @@
-# Build Story — UOB IT PMO Kanban Board
+# Build Story — Skills Catalog Board
 
 A record of how this project was built in a single session with Claude Code, on 16 September 2026.
-It covers what was built, how it was verified, and — more usefully — the three points where
+It covers what was built, how it was verified, and — more usefully — the points where
 reality diverged from the plan.
 
-This is a training artifact. The app is a demo, not a real UOB system.
+> **Note:** Stages 1–5 below describe the app's first life as a fictional "UOB IT PMO" project
+> board. It was later re-domained into a Claude Code skills catalog and given an executive
+> dashboard — see *Stage 6*. The engine described below is unchanged; the content is not.
+
+This is a training artifact.
 
 **Live site:** https://devsecops-ce.github.io/claudetraing-kanban/
 
@@ -224,3 +228,76 @@ the check that actually confirms the outcome.
 **Ordering matters when a fix is blocked.** The scope rejection bundled a security fix with a
 feature. Splitting them shipped the fix in minutes rather than after an interactive
 re-authentication.
+
+
+---
+
+## Stage 6 — Re-domained into a skills catalog, then a CEO dashboard
+
+The brief changed twice in one session: first *"update the board with all available skills"*,
+then *"revamp with graphical and best way to projection CEO meeting"*, then *"change UI also"*.
+
+**The first ask was genuinely ambiguous** — "update the board **with** all available skills"
+reads either as *use those skills as tools to improve the board* or as *make the skills the
+board's content*. Those are completely different deliverables on a 1,381-line file, so it was
+put to the user rather than guessed. The answer was the second reading.
+
+### What the content became
+
+Twenty-four agent skills, each placed by **verified** state rather than invention:
+
+- `gws` was checked with `command -v` → `persona-project-manager` is genuinely **Blocked**.
+- `FIRECRAWL_API_KEY` and `KIBANA_URL` were checked → both unset, so those two are **Blocked**.
+- `image-3d` was absent from both `.agents/skills/` and `skills-lock.json` → its `npx skills add`
+  had exited 137, so it is **Blocked**, not installed.
+- Only `publish-github-pages` went in **In Use**, because the repo's own git log and live site
+  are evidence for it. Nothing else had evidence, so nothing else was claimed.
+
+### Two bugs the rename caused
+
+Renaming `STATUSES` from `["Backlog", …, "Done"]` broke two things that a search for "Backlog"
+alone would not have connected:
+
+1. `openModal()` and `init()` both set `status` to the literal `"Backlog"` — a value that no
+   longer existed, leaving the Add-Skill form with an invalid default.
+2. `isOverdue()` excluded the literal `"Done"`. With `"Done"` gone, the one in-use skill with a
+   past target date started counting as overdue. The harness caught it: the expected split is
+   **2 overdue out of 3 past-target**, and it was reporting 3.
+
+The fix for the second was not to substitute the new string but to derive it —
+`SETTLED_STATUS = STATUSES[STATUSES.length - 1]` — so the next rename cannot reintroduce it.
+A hard-coded string that happens to match a constant is a latent bug waiting for a rename.
+
+### The dashboard
+
+Charts were chosen by the data's job, not by what looks impressive: stat tiles for single
+figures, one horizontal stacked bar for part-to-whole, horizontal bars for magnitude, and a
+plain list for "what is blocked" — because that is not a magnitude question and a chart would
+have obscured it.
+
+The palette was **run through a validator rather than eyeballed**, which changed the design.
+The first attempt — three blues plus a red, treated as a categorical palette — failed on
+lightness band and chroma floor. The reason was a modelling error, not a colour error:
+readiness is an *ordinal progression* (Catalog → Installed → In Use) with one *exception state*
+(Blocked), not four peer categories. Re-validated as a one-hue ordinal ramp it passed every
+check, and Blocked took the reserved status-critical red with a ⚠ icon and a text label so the
+colour never carries the meaning alone.
+
+One number was wrong on the first render and only caught by reading it as a CEO would.
+"Ready to use" was computed as `Installed + In Use` = **4 of 24**, which looks alarming and is
+false: the 16 Catalog skills are built in and usable on demand. The honest figure is
+`total - blocked` = **20 of 24 (83%)**. Arithmetic can be correct and still tell a lie.
+
+### What generalises from this stage
+
+**Ask when two readings produce different deliverables.** Not when you are merely unsure — when
+being wrong means throwing the work away.
+
+**Derive constants instead of matching them.** Both rename bugs were hard-coded strings that
+were correct until the day they were not.
+
+**Run the validator; do not reason about the colour.** It failed the first palette and, in
+explaining why, exposed that the *data model* was wrong — ordinal dressed up as categorical.
+
+**Read your own output as the audience will.** Every check passed while the headline number
+told the opposite of the truth.
