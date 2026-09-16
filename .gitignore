@@ -21,3 +21,6 @@ secrets.*
 
 # Logs
 *.log
+
+# Playwright MCP scratch output
+.playwright-mcp/

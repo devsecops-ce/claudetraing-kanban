@@ -5,6 +5,9 @@ training artifact. One file, no build step, no dependencies.
 
 **Live site:** https://devsecops-ce.github.io/claudetraing-kanban/
 
+![The board in the browser: a four-column Kanban layout with summary counts, filter controls
+and eight seeded demo cards.](docs/screenshot.png)
+
 > Demo / training tool only. Not an official UOB system; no real UOB branding or data is used.
 > All tasks and assignee names in the board are fictional seed data.
 
@@ -56,10 +59,11 @@ publicly, so a plain address here is scrapeable and the open endpoint can be abu
 ## Project structure
 
 ```
-index.html    The entire application — markup, styles, script
-CLAUDE.md     Guidance for Claude Code: constraints, architecture, invariants
-story.md      How the project was built, and where the plan diverged from reality
-README.md     This file
+index.html           The entire application — markup, styles, script
+CLAUDE.md            Guidance for Claude Code: constraints, architecture, invariants
+story.md             How the project was built, and where the plan diverged from reality
+README.md            This file
+docs/screenshot.png  Screenshot of the live site, captured with Playwright
 ```
 
 ## Architecture notes
